@@ -68,7 +68,7 @@ func (u *User) Create(ctx context.Context, log *log.Logger, w http.ResponseWrite
 	// Save User by Email
 	fEmail := func(db *leveldb.DB) error {
 		// TODO: while inserting validate if already exists or not
-		return db.Put([]byte(userDetails.Email), encodedData, nil)
+		return db.Put([]byte(userDetails.Email), []byte(userDetails.ID), nil)
 	}
 
 	if err := dbConn.Execute(fID); err != nil {
@@ -94,6 +94,7 @@ func (u *User) Retrieve(ctx context.Context, log *log.Logger, w http.ResponseWri
 	queryParams := r.URL.Query()
 	var email, id string
 	var usr *UserDetails
+	var err error
 	if len(queryParams["email"]) > 0 {
 		// TODO: add email validation
 		email = queryParams["email"][0]
@@ -101,11 +102,14 @@ func (u *User) Retrieve(ctx context.Context, log *log.Logger, w http.ResponseWri
 	dbConn := u.MasterDB
 	if params["id"] != "" {
 		id = params["id"]
+		usr, err = query(dbConn, id)
 	}
-	if email != "" {
-		id = email
+	if err != nil {
+		return err
 	}
-	usr, err := query(dbConn, id)
+	if email != "" && usr == nil {
+		usr, err = queryByEmail(dbConn, email)
+	}
 	if err != nil {
 		return err
 	}
@@ -113,7 +117,7 @@ func (u *User) Retrieve(ctx context.Context, log *log.Logger, w http.ResponseWri
 	return nil
 }
 
-// Query by ID or Email
+// Query by ID
 func query(dbConn *db.DB, id string) (*UserDetails, error) {
 	var user *UserDetails
 	f := func(db *leveldb.DB) error {
@@ -132,4 +136,29 @@ func query(dbConn *db.DB, id string) (*UserDetails, error) {
 		return nil, errors.Wrap(err, "")
 	}
 	return user, nil
+}
+
+// Query by Email implmenting Unique Secondary Index
+// KV Pair key as email & value as id
+// -------------------------------------------------------------
+// | email              | id                                   |
+// | hitesh@udacity.com | a2bf82ee-0d04-418d-91bb-89894410d1b6 |
+// | ----------
+// -------------------------------------------------------------
+func queryByEmail(dbConn *db.DB, email string) (*UserDetails, error) {
+	var id *string
+	f := func(db *leveldb.DB) error {
+		data, err := db.Get([]byte(email), nil)
+		if err != nil {
+			return err
+		}
+		tempID := string(data)
+
+		id = &tempID
+		return nil
+	}
+	if err := dbConn.Execute(f); err != nil {
+		return nil, errors.Wrap(err, "")
+	}
+	return query(dbConn, *id)
 }

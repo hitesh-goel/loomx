@@ -1,6 +1,12 @@
 # Service Architecture is based on ArdanLabs Service Starter Kit
 https://github.com/ardanlabs/service
 
+## ID is a UUID getting used for Primary Index
+URL: http://0.0.0.0:3000/v1/user/{id}
+
+## Secondary Index is implemented as a Unique Index on Line 142 in handlers/users.go
+URL: http://0.0.0.0:3000/v1/user?email={email}
+
 ## Most of the validations have to be taken care of
 Added todo notes for the same
 
@@ -28,11 +34,6 @@ Request Body: {
 }
 
 Content-Type: application/json
-
-
-## GET requests
-URL: http://0.0.0.0:3000/v1/user/{id}
-URL: http://0.0.0.0:3000/v1/user?email={email}
 
 ## Folder Structure
 * Internal folder mostly contains platform related stuff
